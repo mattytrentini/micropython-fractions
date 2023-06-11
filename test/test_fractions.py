@@ -1,6 +1,6 @@
 """Tests for Lib/fractions.py."""
 
-from decimal import Decimal
+from decimal import DecimalNumber as Decimal
 # from test.support import requires_IEEE_754
 import math
 import numbers
@@ -52,6 +52,9 @@ class DummyRational(object):
     """Test comparison of Fraction with a naive rational implementation."""
 
     def __init__(self, num, den):
+        # TODO(mst) MicroPython doesn't currently have a gcd implementation.
+        # This will need a temporary workaround.
+        # See https://github.com/micropython/micropython/pull/8331
         g = math.gcd(num, den)
         self.num = num // g
         self.den = den // g
@@ -430,6 +433,8 @@ class FractionTest(unittest.TestCase):
     def testBoolGuarateesBoolReturn(self):
         # Ensure that __bool__ is used on numerator which guarantees a bool
         # return.  See also bpo-39274.
+        # TODO(mst) MicroPython doesn't have total_ordering. 
+        # See micropython-lib/functools: https://github.com/micropython/micropython-lib/blob/master/python-stdlib/functools/functools.py
         @functools.total_ordering
         class CustomValue:
             denominator = 1
