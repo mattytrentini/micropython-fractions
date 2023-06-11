@@ -1,0 +1,10 @@
+{
+    "urls": [
+        [
+            "micropython-fractions.py",
+            "github:AddFullPath/micropython-fractions.py"
+        ]
+    ],
+    "deps": [],
+    "version": "0.1"
+}
