@@ -5,6 +5,6 @@
             "github:AddFullPath/micropython-fractions.py"
         ]
     ],
-    "deps": [],
+    "deps": [["github:HowManyOliversAreThere/micropython-decimal", "main"]],
     "version": "0.1"
 }

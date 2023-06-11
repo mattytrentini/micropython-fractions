@@ -3,9 +3,8 @@
 
 """Fraction, infinite-precision, rational numbers."""
 
-from decimal import Decimal
+from decimal import DecimalNumber as Decimal
 import math
-import numbers
 import operator
 import re
 import sys
@@ -19,6 +18,8 @@ _PyHASH_MODULUS = sys.hash_info.modulus
 # Value to be used for rationals that reduce to infinity modulo
 # _PyHASH_MODULUS.
 _PyHASH_INF = sys.hash_info.inf
+
+_MPY_REGEX = False
 
 _RATIONAL_FORMAT = re.compile(r"""
     \A\s*                                 # optional whitespace at the start,
@@ -34,8 +35,39 @@ _RATIONAL_FORMAT = re.compile(r"""
     \s*\Z                                 # and optional whitespace to finish
 """, re.VERBOSE | re.IGNORECASE)
 
+# TODO: Change named groups throughout code
 
-class Fraction(numbers.Rational):
+_SIGN_GROUP_NUM = 1
+_NUMER_GROUP_NUM = 2
+_DENOM_GROUP_NUM = 4
+_DECIMAL_GROUP_NUM = 5
+_EXP_GROUP_NUM = 6
+
+_MPY_RATIONAL_FORMAT = re.compile(
+    r"\s*"                        # optional whitespace at the start,
+    r"([-+]?)"                    # an optional sign, then
+    # r"(?=\d|\.\d)"              # lookahead for digit or .digit
+    r"(\d*|\d+(_\d+)*)"           # numerator (possibly empty)
+    r"(?:"                        # followed by
+    r"(?:/(\d+(_\d+)*))?"         #   an optional denominator
+    r"|"                          #   or
+    r"(?:\.(d*|\d+(_\d+)*))?"     #   an optional fractional part
+    r"(?:E([-+]?\d+(_\d+)*))?"    #   and optional exponent
+    r")"
+    r"\s*"                      # and optional whitespace to finish
+)
+
+_MPY_NEW_RATIONAL_FORMAT = re.compile(
+    r"^\s*"                                             # Ignore opening whitespace
+    r"([+-]?(?:\d+(?:_\d+)*)*(?:\.(?:\d+(?:_\d+)*)*)?)" # Numerator
+    r"("                                                # Opener for second section, either denominator or exponent
+    r"/((?:\d+(?:_\d+)*)*(?:\.(?:\d+(?:_\d+)*)*)?)"     # Denominator
+    r"|"
+    r"[eE][+-]?\d+(?:_\d+)*)?"                          # Exponent
+    r"\s*$"                                             # Ignore closing whitespace
+)
+
+class Fraction():
     """This class implements rational numbers.
 
     In the two-argument form of the constructor, Fraction(8, 6) will
@@ -98,10 +130,10 @@ class Fraction(numbers.Rational):
                 self._denominator = 1
                 return self
 
-            elif isinstance(numerator, numbers.Rational):
-                self._numerator = numerator.numerator
-                self._denominator = numerator.denominator
-                return self
+            # elif isinstance(numerator, numbers.Rational):
+            #     self._numerator = numerator.numerator
+            #     self._denominator = numerator.denominator
+            #     return self
 
             elif isinstance(numerator, (float, Decimal)):
                 # Exact conversion
@@ -110,7 +142,11 @@ class Fraction(numbers.Rational):
 
             elif isinstance(numerator, str):
                 # Handle construction from strings.
-                m = _RATIONAL_FORMAT.match(numerator)
+                m = (
+                    _MPY_RATIONAL_FORMAT.match(numerator.upper())
+                    if _MPY_REGEX
+                    else _RATIONAL_FORMAT.match(numerator)
+                )
                 if m is None:
                     raise ValueError('Invalid literal for Fraction: %r' %
                                      numerator)
@@ -143,12 +179,12 @@ class Fraction(numbers.Rational):
         elif type(numerator) is int is type(denominator):
             pass # *very* normal case
 
-        elif (isinstance(numerator, numbers.Rational) and
-            isinstance(denominator, numbers.Rational)):
-            numerator, denominator = (
-                numerator.numerator * denominator.denominator,
-                denominator.numerator * numerator.denominator
-                )
+        # elif (isinstance(numerator, numbers.Rational) and
+        #     isinstance(denominator, numbers.Rational)):
+        #     numerator, denominator = (
+        #         numerator.numerator * denominator.denominator,
+        #         denominator.numerator * numerator.denominator
+        #         )
         else:
             raise TypeError("both arguments should be "
                             "Rational instances")
@@ -172,7 +208,7 @@ class Fraction(numbers.Rational):
         Beware that Fraction.from_float(0.3) != Fraction(3, 10).
 
         """
-        if isinstance(f, numbers.Integral):
+        if isinstance(f, int):
             return cls(f)
         elif not isinstance(f, float):
             raise TypeError("%s.from_float() only takes floats, not %r (%s)" %
@@ -182,8 +218,8 @@ class Fraction(numbers.Rational):
     @classmethod
     def from_decimal(cls, dec):
         """Converts a finite Decimal instance to a rational number, exactly."""
-        from decimal import Decimal
-        if isinstance(dec, numbers.Integral):
+        from decimal import DecimalNumber
+        if isinstance(dec, int):
             dec = Decimal(int(dec))
         elif not isinstance(dec, Decimal):
             raise TypeError(
@@ -306,13 +342,13 @@ class Fraction(numbers.Rational):
             def __radd__(self, other):
                 # radd handles more types than add because there's
                 # nothing left to fall back to.
-                if isinstance(other, numbers.Rational):
-                    return Fraction(self.numerator * other.denominator +
-                                    other.numerator * self.denominator,
-                                    self.denominator * other.denominator)
-                elif isinstance(other, Real):
+                # if isinstance(other, numbers.Rational):
+                #     return Fraction(self.numerator * other.denominator +
+                #                     other.numerator * self.denominator,
+                #                     self.denominator * other.denominator)
+                if isinstance(other, int):
                     return float(other) + float(self)
-                elif isinstance(other, Complex):
+                elif isinstance(other, complex):
                     return complex(other) + complex(self)
                 return NotImplemented
 
@@ -367,12 +403,12 @@ class Fraction(numbers.Rational):
         forward.__doc__ = monomorphic_operator.__doc__
 
         def reverse(b, a):
-            if isinstance(a, numbers.Rational):
-                # Includes ints.
-                return monomorphic_operator(a, b)
-            elif isinstance(a, numbers.Real):
+            # if isinstance(a, numbers.Rational):
+            #     # Includes ints.
+            #     return monomorphic_operator(a, b)
+            if isinstance(a, int) or isinstance(a, float):
                 return fallback_operator(float(a), float(b))
-            elif isinstance(a, numbers.Complex):
+            elif isinstance(a, complex):
                 return fallback_operator(complex(a), complex(b))
             else:
                 return NotImplemented
@@ -546,27 +582,27 @@ class Fraction(numbers.Rational):
         result will be rational.
 
         """
-        if isinstance(b, numbers.Rational):
-            if b.denominator == 1:
-                power = b.numerator
-                if power >= 0:
-                    return Fraction(a._numerator ** power,
-                                    a._denominator ** power,
-                                    _normalize=False)
-                elif a._numerator >= 0:
-                    return Fraction(a._denominator ** -power,
-                                    a._numerator ** -power,
-                                    _normalize=False)
-                else:
-                    return Fraction((-a._denominator) ** -power,
-                                    (-a._numerator) ** -power,
-                                    _normalize=False)
-            else:
-                # A fractional power will generally produce an
-                # irrational number.
-                return float(a) ** float(b)
-        else:
-            return float(a) ** b
+        # if isinstance(b, numbers.Rational):
+        #     if b.denominator == 1:
+        #         power = b.numerator
+        #         if power >= 0:
+        #             return Fraction(a._numerator ** power,
+        #                             a._denominator ** power,
+        #                             _normalize=False)
+        #         elif a._numerator >= 0:
+        #             return Fraction(a._denominator ** -power,
+        #                             a._numerator ** -power,
+        #                             _normalize=False)
+        #         else:
+        #             return Fraction((-a._denominator) ** -power,
+        #                             (-a._numerator) ** -power,
+        #                             _normalize=False)
+        #     else:
+        #         # A fractional power will generally produce an
+        #         # irrational number.
+        #         return float(a) ** float(b)
+        # else:
+        return float(a) ** b
 
     def __rpow__(b, a):
         """a ** b"""
@@ -574,8 +610,8 @@ class Fraction(numbers.Rational):
             # If a is an int, keep it that way if possible.
             return a ** b._numerator
 
-        if isinstance(a, numbers.Rational):
-            return Fraction(a.numerator, a.denominator) ** b
+        # if isinstance(a, numbers.Rational):
+        #     return Fraction(a.numerator, a.denominator) ** b
 
         if b._denominator == 1:
             return a ** b._numerator
@@ -679,10 +715,10 @@ class Fraction(numbers.Rational):
         """a == b"""
         if type(b) is int:
             return a._numerator == b and a._denominator == 1
-        if isinstance(b, numbers.Rational):
-            return (a._numerator == b.numerator and
-                    a._denominator == b.denominator)
-        if isinstance(b, numbers.Complex) and b.imag == 0:
+        # if isinstance(b, numbers.Rational):
+        #     return (a._numerator == b.numerator and
+        #             a._denominator == b.denominator)
+        if isinstance(b, complex) and b.imag == 0:
             b = b.real
         if isinstance(b, float):
             if math.isnan(b) or math.isinf(b):
@@ -707,9 +743,9 @@ class Fraction(numbers.Rational):
 
         """
         # convert other to a Rational instance where reasonable.
-        if isinstance(other, numbers.Rational):
-            return op(self._numerator * other.denominator,
-                      self._denominator * other.numerator)
+        # if isinstance(other, numbers.Rational):
+        #     return op(self._numerator * other.denominator,
+        #               self._denominator * other.numerator)
         if isinstance(other, float):
             if math.isnan(other) or math.isinf(other):
                 return op(0.0, other)

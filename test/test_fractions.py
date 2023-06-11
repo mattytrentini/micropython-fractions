@@ -6,13 +6,9 @@ import math
 import numbers
 import operator
 import fractions
-import functools
 import sys
 import typing
 import unittest
-from copy import copy, deepcopy
-import pickle
-from pickle import dumps, loads
 F = fractions.Fraction
 
 
@@ -48,6 +44,11 @@ class DummyFloat(object):
     __rsub__ = __sub__
 
 
+def gcd(a, b) :
+	while b:
+		a, b = b, a % b
+	return a
+
 class DummyRational(object):
     """Test comparison of Fraction with a naive rational implementation."""
 
@@ -55,7 +56,7 @@ class DummyRational(object):
         # TODO(mst) MicroPython doesn't currently have a gcd implementation.
         # This will need a temporary workaround.
         # See https://github.com/micropython/micropython/pull/8331
-        g = math.gcd(num, den)
+        g = gcd(num, den)
         self.num = num // g
         self.den = den // g
 
@@ -430,44 +431,6 @@ class FractionTest(unittest.TestCase):
         self.assertEqual(int(f), 2)
         self.assertEqual(type(int(f)), int)
 
-    def testBoolGuarateesBoolReturn(self):
-        # Ensure that __bool__ is used on numerator which guarantees a bool
-        # return.  See also bpo-39274.
-        # TODO(mst) MicroPython doesn't have total_ordering. 
-        # See micropython-lib/functools: https://github.com/micropython/micropython-lib/blob/master/python-stdlib/functools/functools.py
-        @functools.total_ordering
-        class CustomValue:
-            denominator = 1
-
-            def __init__(self, value):
-                self.value = value
-
-            def __bool__(self):
-                return bool(self.value)
-
-            @property
-            def numerator(self):
-                # required to preserve `self` during instantiation
-                return self
-
-            def __eq__(self, other):
-                raise AssertionError("Avoid comparisons in Fraction.__bool__")
-
-            __lt__ = __eq__
-
-        # We did not implement all abstract methods, so register:
-        numbers.Rational.register(CustomValue)
-
-        numerator = CustomValue(1)
-        r = F(numerator)
-        # ensure the numerator was not lost during instantiation:
-        self.assertIs(r.numerator, numerator)
-        self.assertIs(bool(r), True)
-
-        numerator = CustomValue(0)
-        r = F(numerator)
-        self.assertIs(bool(r), False)
-
     def testRound(self):
         self.assertTypedEquals(F(-200), round(F(-150), -2))
         self.assertTypedEquals(F(-200), round(F(-250), -2))
@@ -797,18 +760,6 @@ class FractionTest(unittest.TestCase):
             sign *= -1
             s += num / fact * sign
         self.assertAlmostEqual(math.cos(1), s)
-
-    def test_copy_deepcopy_pickle(self):
-        r = F(13, 7)
-        dr = DummyFraction(13, 7)
-        for proto in range(0, pickle.HIGHEST_PROTOCOL + 1):
-            self.assertEqual(r, loads(dumps(r, proto)))
-        self.assertEqual(id(r), id(copy(r)))
-        self.assertEqual(id(r), id(deepcopy(r)))
-        self.assertNotEqual(id(dr), id(copy(dr)))
-        self.assertNotEqual(id(dr), id(deepcopy(dr)))
-        self.assertTypedEquals(dr, copy(dr))
-        self.assertTypedEquals(dr, deepcopy(dr))
 
     def test_slots(self):
         # Issue 4998
