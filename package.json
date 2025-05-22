@@ -1,10 +1,7 @@
 {
-    "urls": [
-        [
-            "micropython-fractions.py",
-            "github:AddFullPath/micropython-fractions.py"
-        ]
-    ],
-    "deps": [["github:HowManyOliversAreThere/micropython-decimal", "main"]],
-    "version": "0.1"
+  "urls": [
+    ["fractions.py", "github:mattytrentini/micropython-fractions/src/fractions.py"]
+  ],
+  "deps": [["github:HowManyOliversAreThere/micropython-decimal", "main"]],
+  "version": "0.1"
 }
